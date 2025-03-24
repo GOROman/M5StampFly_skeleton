@@ -110,16 +110,32 @@ sequenceDiagram
     Main->>UI: UI初期化
     Main->>Telemetry: 通信初期化
 
-    loop 400Hz周期
+    rect rgb(200, 200, 200)
+        Note over Loop: 400Hz周期処理
         Loop->>Sensors: IMU/ToFデータ要求
-        Sensors-->>Loop: センサーデータ
-        Loop->>Control: 姿勢/高度データ
-        Control->>Control: PID制御計算
-        Control->>Motors: モーター出力設定
-        Loop->>UI: 状態更新
-        UI-->>Loop: ユーザー入力
-        Loop->>Telemetry: テレメトリーデータ
-        Telemetry-->>Loop: 通信状態
+        alt センサー正常
+            Sensors-->>Loop: センサーデータ
+            Loop->>Control: 姿勢/高度データ
+            Control->>Control: PID制御計算
+            Control->>Motors: モーター出力設定
+        else センサーエラー
+            Sensors--xLoop: エラー通知
+            Loop->>UI: エラー表示
+            Loop->>Motors: 安全停止
+        end
+
+        alt UI入力あり
+            UI-->>Loop: ユーザー入力
+            Loop->>Control: 制御パラメータ更新
+        end
+
+        Loop->>Telemetry: テレメトリーデータ送信
+        alt 通信成功
+            Telemetry-->>Loop: ACK
+        else 通信エラー
+            Telemetry--xLoop: 通信エラー
+            Loop->>UI: 通信状態表示
+        end
     end
 ```
 
