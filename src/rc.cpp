@@ -24,46 +24,48 @@
  */
 
 #include "rc.hpp"
-#include <WiFi.h>
-#include <esp_now.h>
-#include <esp_wifi.h>
 #include "main_loop.hpp"
 
-// esp_now_peer_info_t slave;
+// Global variables
+volatile float Stick[16] = {0};
+volatile uint8_t Rc_err_flag = 0;
+volatile bool BleConnected = false;
 
-volatile uint16_t Connect_flag = 0;
+// BLE Server pointers
+BLEServer* pServer = nullptr;
+BLECharacteristic* pControlCharacteristic = nullptr;
+BLECharacteristic* pTelemetryCharacteristic = nullptr;
 
-// Telemetry相手のMAC ADDRESS 4C:75:25:AD:B6:6C
-// ATOM Lite (C): 4C:75:25:AE:27:FC
-// 4C:75:25:AD:8B:20
-// 4C:75:25:AF:4E:84
-// 4C:75:25:AD:8B:20
-// 4C:75:25:AD:8B:20 赤水玉テープ　ATOM lite
-uint8_t JoyAddr[6] = {0};
-uint8_t TelemAddr[6] = {0x4C, 0x75, 0x25, 0xAD, 0x8B, 0x20};
-volatile uint8_t MyMacAddr[6];
-volatile uint8_t peer_command[4] = {0xaa, 0x55, 0x16, 0x88};
-volatile uint8_t Rc_err_flag     = 0;
-esp_now_peer_info_t peerInfo[2];
-esp_now_send_status_t esp_now_send_status;
-volatile uint8_t SendAddress[6];
-
+// Connection counter for timeout detection
+static uint32_t connectionCounter = 0;
 
 /**
- * @brief スティック入力とボタン状態を格納する配列
- * - [0]: RUDDER (ラダー)
- * - [1]: THROTTLE (スロットル)
- * - [2]: AILERON (エルロン)
- * - [3]: ELEVATOR (エレベーター)
- * - [4]: BUTTON_ARM (アーム)
- * - [5]: BUTTON_FLIP (フリップ)
- * - [6]: CONTROLMODE (制御モード)
- * - [7]: ALTCONTROLMODE (高度制御モード)
+ * @brief BLEサーバーコールバッククラス
  */
-volatile float Stick[16];
+class ServerCallbacks: public BLEServerCallbacks {
+    void onConnect(BLEServer* pServer) {
+        BleConnected = true;
+        connectionCounter = 0;
+    };
 
-/** @brief 受信したMAC アドレスの下位3バイトを格納 */
-volatile uint8_t Recv_MAC[3];
+    void onDisconnect(BLEServer* pServer) {
+        BleConnected = false;
+        pServer->startAdvertising();
+    }
+};
+
+/**
+ * @brief コントロールキャラクタリスティックコールバッククラス
+ */
+class ControlCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+        std::string value = pCharacteristic->getValue();
+        if (value.length() == sizeof(float) * 16) {
+            memcpy((void*)Stick, value.data(), sizeof(float) * 16);
+            connectionCounter = 0;
+        }
+    }
+};
 
 /**
  * @brief ESP-NOW送信完了時のコールバック関数

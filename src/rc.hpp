@@ -28,14 +28,17 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <esp_now.h>
+#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
 
-// #define MINIJOYC
+// BLE Service and Characteristic UUIDs
+#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CONTROL_CHAR_UUID   "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+#define TELEMETRY_CHAR_UUID "8b7c9c6a-c2dc-41e9-a087-7f4c2f9a75d0"
 
-#define CHANNEL (3)
-#define JOY (0)
-#define TELEM (0)
-
+// Control channel indices
 #define RUDDER         (0)
 #define ELEVATOR       (1)
 #define THROTTLE       (2)
@@ -50,19 +53,21 @@
 #define CONTROLMODE    (11)
 #define ALTCONTROLMODE (12)
 
+// Function declarations
 void rc_init(void);
 void rc_demo(void);
 void rc_end(void);
 uint8_t rc_isconnected(void);
-uint8_t telemetry_send(esp_now_peer_info_t* peerInfo, uint8_t *data, uint16_t datalen);
+void telemetry_send(uint8_t *data, uint16_t datalen);
 
-void send_peer_info(void);
-
+// Global variables
 extern volatile float Stick[16];
 extern volatile uint8_t Rc_err_flag;
-extern volatile uint8_t MyMacAddr[6];
-extern volatile uint8_t Recv_MAC[3];
-extern volatile uint16_t Connect_flag;
-extern esp_now_peer_info_t peerInfo[2];
+extern volatile bool BleConnected;
+
+// BLE Server pointer
+extern BLEServer* pServer;
+extern BLECharacteristic* pControlCharacteristic;
+extern BLECharacteristic* pTelemetryCharacteristic;
 
 #endif
