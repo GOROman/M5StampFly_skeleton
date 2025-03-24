@@ -49,13 +49,41 @@ esp_now_send_status_t esp_now_send_status;
 volatile uint8_t SendAddress[6];
 
 
-// RC
+/**
+ * @brief スティック入力とボタン状態を格納する配列
+ * - [0]: RUDDER (ラダー)
+ * - [1]: THROTTLE (スロットル)
+ * - [2]: AILERON (エルロン)
+ * - [3]: ELEVATOR (エレベーター)
+ * - [4]: BUTTON_ARM (アーム)
+ * - [5]: BUTTON_FLIP (フリップ)
+ * - [6]: CONTROLMODE (制御モード)
+ * - [7]: ALTCONTROLMODE (高度制御モード)
+ */
 volatile float Stick[16];
+
+/** @brief 受信したMAC アドレスの下位3バイトを格納 */
 volatile uint8_t Recv_MAC[3];
 
+/**
+ * @brief ESP-NOW送信完了時のコールバック関数
+ * @param mac_addr 送信先のMACアドレス
+ * @param status 送信状態（成功/失敗）
+ */
 void on_esp_now_sent(const uint8_t *mac_addr, esp_now_send_status_t status);
 
-// 受信コールバック
+/**
+ * @brief ESP-NOWデータ受信時のコールバック関数
+ * 
+ * 受信したデータを以下の順序で処理します：
+ * 1. 送信元のMACアドレスを確認し、未登録の場合は登録
+ * 2. 受信データの整合性チェック（MACアドレス、チェックサム）
+ * 3. スティック入力とボタン状態の更新
+ * 
+ * @param mac_addr 送信元のMACアドレス
+ * @param recv_data 受信データ
+ * @param data_len データ長
+ */
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *recv_data, int data_len) {
     Connect_flag = 0;
 
@@ -159,11 +187,21 @@ void on_esp_now_sent(const uint8_t *mac_addr, esp_now_send_status_t status) {
     #endif
 }
 
+/**
+ * @brief リモートコントロールシステムの初期化
+ * 
+ * 以下の初期化処理を実行します：
+ * 1. スティック入力の初期化
+ * 2. ESP-NOWの初期化とWiFiのSTAモード設定
+ * 3. MACアドレスの取得と表示
+ * 4. ブロードキャストピアの設定
+ * 5. 自身のMACアドレスの通知
+ */
 void rc_init(void) {
-    // Initialize Stick list
+    // スティック入力の初期化
     for (uint8_t i = 0; i < 16; i++) Stick[i] = 0.0;
 
-    // ESP-NOW初期化
+    // ESP-NOWの初期化とWiFiのSTAモード設定
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
 
@@ -222,21 +260,43 @@ void rc_init(void) {
     USBSerial.println("ESP-NOW Ready.");
 }
 
+/**
+ * @brief 自身の情報をピアに送信
+ * 
+ * 以下の情報を送信します：
+ * - 使用するWiFiチャネル
+ * - 自身のMACアドレス
+ * - ピアコマンド情報
+ */
 void send_peer_info(void) {
     uint8_t data[11];
-    data[0] = CHANNEL;
-    memcpy(&data[1], (uint8_t *)MyMacAddr, 6);
-    memcpy(&data[1 + 6], (uint8_t *)peer_command, 4);
+    data[0] = CHANNEL;                              // WiFiチャネル
+    memcpy(&data[1], (uint8_t *)MyMacAddr, 6);     // MACアドレス
+    memcpy(&data[1 + 6], (uint8_t *)peer_command, 4);  // ピアコマンド
     esp_now_send(peerInfo[JOY].peer_addr, data, 11);
 }
 
+/**
+ * @brief テレメトリーデータの送信とエラー処理
+ * 
+ * 以下の機能を提供します：
+ * - ESP-NOWを使用したデータ送信
+ * - 送信エラーの検出と処理
+ * - 自動的なエラー状態からの復帰（500カウント後）
+ * 
+ * @param peerInfo 送信先のESP-NOWピア情報
+ * @param data 送信データ
+ * @param datalen データ長
+ * @return uint8_t エラー状態（0: 正常, 1: エラー）
+ */
 uint8_t telemetry_send(esp_now_peer_info_t* peerInfo, uint8_t *data, uint16_t datalen) {
-    static uint32_t cnt       = 0;
-    static uint8_t error_flag = 0;
-    static uint8_t state      = 0;
+    static uint32_t cnt       = 0;  // カウンタ
+    static uint8_t error_flag = 0;  // エラー状態フラグ
+    static uint8_t state      = 0;  // 送信状態
 
     esp_err_t result;
 
+    // エラーがなく、送信可能な状態の場合に送信を実行
     if ((error_flag == 0) && (state == 0)) {
         result = esp_now_send(peerInfo->peer_addr, data, datalen);
         cnt    = 0;
@@ -244,14 +304,16 @@ uint8_t telemetry_send(esp_now_peer_info_t* peerInfo, uint8_t *data, uint16_t da
     } else
         cnt++;
 
+    // 送信結果に基づいてエラー状態を更新
     if (esp_now_send_status == ESP_NOW_SEND_SUCCESS) {
-        error_flag = 0;
+        error_flag = 0;  // 送信成功
         // state = 0;
     } else {
-        error_flag = 1;
+        error_flag = 1;  // 送信失敗
         // state = 1;
     }
-    // 一度送信エラーを検知してもしばらくしたら復帰する
+
+    // 500カウント経過後にエラー状態をリセット
     if (cnt > 500) {
         error_flag = 0;
         cnt        = 0;
@@ -266,13 +328,21 @@ void rc_end(void) {
     // Ps3.end();
 }
 
+/**
+ * @brief リモートコントロールの接続状態を確認
+ * 
+ * Connect_flagを使用して接続状態を判定します。
+ * 40カウント以上経過した場合、切断と判断します。
+ * 
+ * @return uint8_t 接続状態（1: 接続中, 0: 切断）
+ */
 uint8_t rc_isconnected(void) {
     bool status;
     Connect_flag++;
-    if (Connect_flag < 40)
+    if (Connect_flag < 40)  // 40カウント未満は接続中と判断
         status = 1;
     else
-        status = 0;
+        status = 0;  // 40カウント以上は切断と判断
     // USBSerial.printf("%d \n\r", Connect_flag);
     return status;
 }
