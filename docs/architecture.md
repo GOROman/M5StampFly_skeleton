@@ -96,44 +96,44 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant main as メイン
-    participant loop as ループ
+    participant mainloop as メインループ
     participant sensors as センサー
     participant control as 制御
     participant motors as モーター
     participant ui as UI
     participant telemetry as テレメトリー
 
-    main->>loop: システム初期化
+    main->>mainloop: システム初期化
     main->>sensors: センサー初期化
     main->>control: 制御系初期化
     main->>motors: モーター初期化
     main->>ui: UI初期化
     main->>telemetry: 通信初期化
 
-    Note over loop: 400Hz周期処理
-    loop->>sensors: IMU/ToFデータ要求
+    Note over mainloop: 400Hz周期処理
+    mainloop->>sensors: IMU/ToFデータ要求
     alt センサー正常
-        sensors->>loop: センサーデータ
-        loop->>control: 姿勢/高度データ
+        sensors->>mainloop: センサーデータ
+        mainloop->>control: 姿勢/高度データ
         control->>control: PID制御計算
         control->>motors: モーター出力設定
     else センサーエラー
         sensors->>loop: エラー通知
-        loop->>ui: エラー表示
-        loop->>motors: 安全停止
+        mainloop->>ui: エラー表示
+        mainloop->>motors: 安全停止
     end
 
     alt UI入力あり
-        ui->>loop: ユーザー入力
-        loop->>control: 制御パラメータ更新
+        ui->>mainloop: ユーザー入力
+        mainloop->>control: 制御パラメータ更新
     end
 
-    loop->>telemetry: テレメトリーデータ送信
+    mainloop->>telemetry: テレメトリーデータ送信
     alt 通信成功
-        telemetry->>loop: ACK
+        telemetry->>mainloop: ACK
     else 通信エラー
-        telemetry->>loop: 通信エラー
-        loop->>ui: 通信状態表示
+        telemetry->>mainloop: 通信エラー
+        mainloop->>ui: 通信状態表示
     end
 ```
 
