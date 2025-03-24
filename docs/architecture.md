@@ -95,45 +95,45 @@ graph TB
 
 ```mermaid
 sequenceDiagram
-    participant Main as Main
-    participant Loop as Loop
-    participant Sensors as Sensors
-    participant Control as Control
-    participant Motors as Motors
-    participant UI as UI
-    participant Telemetry as Telemetry
+    participant main as メイン
+    participant loop as ループ
+    participant sensors as センサー
+    participant control as 制御
+    participant motors as モーター
+    participant ui as UI
+    participant telemetry as テレメトリー
 
-    Main->>Loop: システム初期化
-    Main->>Sensors: センサー初期化
-    Main->>Control: 制御系初期化
-    Main->>Motors: モーター初期化
-    Main->>UI: UI初期化
-    Main->>Telemetry: 通信初期化
+    main->>loop: システム初期化
+    main->>sensors: センサー初期化
+    main->>control: 制御系初期化
+    main->>motors: モーター初期化
+    main->>ui: UI初期化
+    main->>telemetry: 通信初期化
 
-    Note over Loop: 400Hz周期処理
-    Loop->>Sensors: IMU/ToFデータ要求
+    Note over loop: 400Hz周期処理
+    loop->>sensors: IMU/ToFデータ要求
     alt センサー正常
-        Sensors->>Loop: センサーデータ
-        Loop->>Control: 姿勢/高度データ
-        Control->>Control: PID制御計算
-        Control->>Motors: モーター出力設定
+        sensors->>loop: センサーデータ
+        loop->>control: 姿勢/高度データ
+        control->>control: PID制御計算
+        control->>motors: モーター出力設定
     else センサーエラー
-        Sensors->>Loop: エラー通知
-        Loop->>UI: エラー表示
-        Loop->>Motors: 安全停止
+        sensors->>loop: エラー通知
+        loop->>ui: エラー表示
+        loop->>motors: 安全停止
     end
 
     alt UI入力あり
-        UI->>Loop: ユーザー入力
-        Loop->>Control: 制御パラメータ更新
+        ui->>loop: ユーザー入力
+        loop->>control: 制御パラメータ更新
     end
 
-    Loop->>Telemetry: テレメトリーデータ送信
+    loop->>telemetry: テレメトリーデータ送信
     alt 通信成功
-        Telemetry->>Loop: ACK
+        telemetry->>loop: ACK
     else 通信エラー
-        Telemetry->>Loop: 通信エラー
-        Loop->>UI: 通信状態表示
+        telemetry->>loop: 通信エラー
+        loop->>ui: 通信状態表示
     end
 ```
 
