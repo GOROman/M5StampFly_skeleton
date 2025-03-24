@@ -118,7 +118,7 @@ sequenceDiagram
         control->>control: PID制御計算
         control->>motors: モーター出力設定
     else センサーエラー
-        sensors->>loop: エラー通知
+        sensors->>mainloop: エラー通知
         mainloop->>ui: エラー表示
         mainloop->>motors: 安全停止
     end
