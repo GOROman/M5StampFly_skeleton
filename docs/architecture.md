@@ -10,6 +10,7 @@ graph TB
         MOTOR[モーター]
         LED[LED]
         BUZZER[ブザー]
+        BUTTON_H[ボタン]
     end
 
     subgraph Core
@@ -40,17 +41,29 @@ graph TB
         TELEM[telemetry.cpp]
     end
 
-    %% 接続関係
+    %% コア接続
     MAIN --> LOOP
     LOOP --> STAMP
-    STAMP --> |制御| Control
+
+    %% センサー接続
     STAMP --> |センサー読取| Sensors
-    Control --> |モーター制御| MOTOR
     Sensors --> |データ取得| IMU
     Sensors --> |データ取得| TOF
-    TELEM --> |データ送信| Communication
-    UI --> |状態表示| LED
-    UI --> |音声通知| BUZZER
+
+    %% 制御接続
+    STAMP --> |制御| Control
+    Control --> |モーター制御| MOTOR_C
+    MOTOR_C --> |PWM出力| MOTOR
+    RC --> |制御入力| Control
+
+    %% UI接続
+    STAMP --> |状態通知| UI
+    LED_C --> |制御| LED
+    BUZZER_C --> |制御| BUZZER
+    BUTTON --> |入力| BUTTON_H
+
+    %% テレメトリー接続
+    STAMP --> |状態データ| TELEM
 ```
 
 ## ソースコードの構造
@@ -87,15 +100,26 @@ sequenceDiagram
     participant Sensors
     participant Control
     participant Motors
+    participant UI
     participant Telemetry
 
-    Main->>Loop: 初期化
+    Main->>Loop: システム初期化
+    Main->>Sensors: センサー初期化
+    Main->>Control: 制御系初期化
+    Main->>Motors: モーター初期化
+    Main->>UI: UI初期化
+    Main->>Telemetry: 通信初期化
+
     loop 400Hz周期
-        Loop->>Sensors: センサーデータ取得
-        Sensors-->>Loop: IMU/ToFデータ
-        Loop->>Control: 制御計算
+        Loop->>Sensors: IMU/ToFデータ要求
+        Sensors-->>Loop: センサーデータ
+        Loop->>Control: 姿勢/高度データ
+        Control->>Control: PID制御計算
         Control->>Motors: モーター出力設定
-        Loop->>Telemetry: データ送信
+        Loop->>UI: 状態更新
+        UI-->>Loop: ユーザー入力
+        Loop->>Telemetry: テレメトリーデータ
+        Telemetry-->>Loop: 通信状態
     end
 ```
 
