@@ -58,27 +58,31 @@ void parking_mode(void);
 void loop_400Hz(void);
 float limit(float value, float min, float max);
 
-// Main loop
+/**
+ * @brief メインの制御ループ関数（400Hz周期で実行）
+ * 
+ * この関数は以下の処理を実行します：
+ * 1. センサー値の更新とIMUの姿勢推定
+ * 2. 現在のモードに応じた制御処理の実行
+ * 3. テレメトリーデータの送信
+ */
 void loop_400Hz(void) {
-    // 400Hzで以降のコードが実行
-
+    // センサー値の更新とIMUの姿勢推定を実行
     update_loop400Hz();
     
-    // Mode select
+    // 現在のモードに応じて適切な制御処理を実行
     if (StampFly.flag.mode == INIT_MODE) 
-        init_mode();
+        init_mode();          // 初期化モード
     else if (StampFly.flag.mode == AVERAGE_MODE)
-        average_mode();
+        average_mode();       // センサーオフセット計算モード
     else if (StampFly.flag.mode == FLIGHT_MODE)
-        flight_mode();
+        flight_mode();        // 飛行モード
     else if (StampFly.flag.mode == PARKING_MODE)
-        parking_mode();
+        parking_mode();       // 着陸/停止モード
 
-    //// Telemetry
+    // テレメトリーデータの送信
     telemetry();
-    StampFly.flag.oldmode = StampFly.flag.mode;  // Memory now mode
-    
-    // End of Loop_400Hz function    
+    StampFly.flag.oldmode = StampFly.flag.mode;  // 現在のモードを記録
 }
 
 // 割り込み関数
@@ -89,15 +93,24 @@ void IRAM_ATTR onTimer(void) {
     //loop_400Hz();
 }
 
-// Initialize StampFly
+/**
+ * @brief StampFlyの初期化処理
+ * 
+ * 以下の初期化を行います：
+ * - 動作モードの初期化
+ * - LEDの初期化
+ * - シリアル通信の初期化
+ * - 各種センサーの初期化
+ * - モーター制御の初期化
+ */
 void init_copter(void) {
     //disableCore1WDT();
-    // Initialize Mode
+    // 動作モードを初期化モードに設定
     StampFly.flag.mode = INIT_MODE;
     StampFly.flag.loop = 0;
-    // Initialaze LED function
+    // LEDの初期化
     led_init();
-    // Initialize Serial communication
+    // シリアル通信の初期化（115200bps）
     USBSerial.begin(115200);
     delay(1500);
     USBSerial.printf("Start StampFly! Skeleton\r\n");
