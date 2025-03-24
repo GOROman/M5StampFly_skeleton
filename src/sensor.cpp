@@ -38,13 +38,25 @@ float roll_rate_offset, pitch_rate_offset, yaw_rate_offset;
 float sensor[16];
 uint16_t offset_counter = 0;
 
+/**
+ * @brief I2Cバス上のデバイスをスキャンします
+ * 
+ * @return uint8_t 発見されたI2Cデバイスの数
+ * 
+ * この関数は以下の処理を行います：
+ * 1. I2Cアドレス空間（1-127）をスキャン
+ * 2. 各アドレスに対して通信を試みる
+ * 3. 応答があったデバイスのアドレスを表示
+ */
 uint8_t scan_i2c() {
     USBSerial.println("I2C scanner. Scanning ...");
     delay(50);
     byte count = 0;
+    
+    // I2Cアドレス空間をスキャン
     for (uint8_t i = 1; i < 127; i++) {
-        Wire1.beginTransmission(i);        // Begin I2C transmission Address (i)
-        if (Wire1.endTransmission() == 0)  // Receive 0 = success (ACK response)
+        Wire1.beginTransmission(i);        // I2C通信を開始
+        if (Wire1.endTransmission() == 0)  // ACK応答があればデバイスが存在
         {
             USBSerial.print("Found address: ");
             USBSerial.print(i, DEC);
@@ -54,8 +66,10 @@ uint8_t scan_i2c() {
             count++;
         }
     }
+    
+    // 発見されたデバイス数を表示
     USBSerial.print("Found ");
-    USBSerial.print(count, DEC);  // numbers of devices
+    USBSerial.print(count, DEC);
     USBSerial.println(" device(s).");
     return count;
 }
@@ -70,19 +84,33 @@ void ahrs_reset(void) {
     ahrs.reset();
 }
 
+/**
+ * @brief 全センサーの初期化を行います
+ * 
+ * この関数は以下の処理を行います：
+ * 1. I2Cバスの初期化とデバイスのスキャン
+ * 2. ToF（Time of Flight）距離センサーの初期化
+ * 3. IMU（慣性計測ユニット）の初期化
+ * 4. 電源電圧モニター（INA3221）の初期化
+ * 5. AHRS（姿勢推定システム）の初期化
+ */
 void sensor_init() {
+    // I2Cバスの初期化（400kHz動作）
     Wire1.begin(SDA_PIN, SCL_PIN, 400000UL);
     if (scan_i2c() == 0) {
         USBSerial.printf("No I2C device!\r\n");
         USBSerial.printf("Can not boot AtomFly2.\r\n");
-        while (1);
+        while (1);  // I2Cデバイスが見つからない場合は停止
     }
-    tof_init();
-    imu_init();
-    ina3221.begin(&Wire1);
+    
+    // 各種センサーの初期化
+    tof_init();             // ToFセンサーの初期化
+    imu_init();             // IMUの初期化
+    ina3221.begin(&Wire1);  // 電源電圧モニターの初期化
     ina3221.reset();
-    ahrs.begin(400.0);
+    ahrs.begin(400.0);       // AHRSの初期化（400Hz動作）
 
+    // ToFセンサーの動作確認
     uint16_t cnt = 0;
     while (cnt < 10) {
         if (ToF_bottom_data_ready_flag) {
@@ -95,7 +123,15 @@ void sensor_init() {
     USBSerial.printf("Finish sensor init!\r\n");
 }
 
+/**
+ * @brief IMUセンサーのオフセット値を計算します
+ * 
+ * 角速度センサー（ジャイロ）の各軸（roll, pitch, yaw）の
+ * オフセット値を移動平均で計算します。
+ * この値はセンサーのバイアス設定に使用されます。
+ */
 void sensor_calc_offset_avarage(void) {
+    // 各軸の角速度オフセットを移動平均で計算
     roll_rate_offset  = (offset_counter * roll_rate_offset  + gx) / (offset_counter + 1);
     pitch_rate_offset = (offset_counter * pitch_rate_offset + gy) / (offset_counter + 1);
     yaw_rate_offset   = (offset_counter * yaw_rate_offset   + gz) / (offset_counter + 1);
